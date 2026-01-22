@@ -315,7 +315,7 @@ body {
     background: white;
     border-radius: 15px;
     padding: 30px;
-    max-width: 800px;
+    max-width: 900px;
     margin: 20px auto;
     box-shadow: 0 5px 20px rgba(0,0,0,0.08);
 }
@@ -2304,4 +2304,29 @@ body {
         text-align: center;
         gap: 15px;
     }
+}
+
+/* Finishing Style */
+.dash{
+    margin-top: 20px;
+}
+.chart_width_hight{
+    width: 650px;
+}
+.regi{
+    margin-bottom: 40px;
+}
+.mother{
+    margin-bottom: 20px;
+}
+.wid{
+    width: 40%;
+}
+.fl{
+    display: flex;
+    gap: 10px;
+}
+.wid1{
+    width: 80%;
+    border-radius: 5px;
 }
