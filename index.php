@@ -87,6 +87,7 @@ $recentAlerts = $conn->query($recentAlertsQuery);
                 <li class="nav-btn active" data-target="dashboard">📊 Dashboard</li>
                 <li class="nav-btn" data-target="register">➕ Register New Pregnancy</li>
                 <li class="nav-btn" data-target="motherManagement">👩 Mother Management</li>
+                <li class="nav-btn Predict_Emergencies" data-target="predictEmergencies">⚠️ Predict Emergencies</li>
                 <li class="nav-btn" data-target="ancHistory">📋 ANC History</li>
                 <li class="nav-btn" data-target="motherProfile">👤 Mother Profile</li>
                 <li class="nav-btn" data-target="deliveryHistory">👶 Delivery History</li>
@@ -126,7 +127,7 @@ $recentAlerts = $conn->query($recentAlertsQuery);
                         </div>
 
                         <div class="card danger predict-emergency" onclick="viewEmergencies()">
-                            <h3>⚠️ Predict Emergencies</h3>
+                            <h3>⚠️ Possible Deliveries </h3>
                             <h1 id="emergencyCount"><?php echo $emergencyCount; ?></h1>
                             <p>Delivery within 7 days</p>
                         </div>
@@ -954,6 +955,271 @@ $recentAlerts = $conn->query($recentAlertsQuery);
                     </form>
                 </div>
             </div>
+            <!-- Predict Emergencies Section -->
+<div id="predictEmergencies" class="section hidden">
+    <h2 class="mother">⚠️ Predict Emergencies</h2>
+    
+    <div class="emergency-management-container">
+        <!-- Emergency Stats -->
+        <div class="emergency-stats fl">
+            <div class="stat-card card wid">
+                <h3>🚨 Critical Cases</h3>
+                <?php
+                $criticalQuery = "SELECT COUNT(*) as count FROM pregnancy_registration WHERE overall_risk = 'High' AND is_active = TRUE AND (delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) OR blood_pressure LIKE '150/%' OR blood_pressure LIKE '160/%')";
+                $criticalResult = $conn->query($criticalQuery);
+                $criticalCount = $criticalResult->fetch_assoc()['count'];
+                ?>
+                <h1><?php echo $criticalCount; ?></h1>
+            </div>
+            <div class="stat-card card wid">
+                <h3>📅 Due This Week</h3>
+                <?php
+                $dueThisWeekQuery = "SELECT COUNT(*) as count FROM pregnancy_registration WHERE delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND is_active = TRUE";
+                $dueThisWeekResult = $conn->query($dueThisWeekQuery);
+                $dueThisWeekCount = $dueThisWeekResult->fetch_assoc()['count'];
+                ?>
+                <h1><?php echo $dueThisWeekCount; ?></h1>
+            </div>
+            <div class="stat-card card wid">
+                <h3>🩺 Need Follow-up</h3>
+                <?php
+                $followupQuery = "SELECT COUNT(DISTINCT pr.id) as count FROM pregnancy_registration pr LEFT JOIN anc_checkup ac ON pr.id = ac.mother_id WHERE pr.overall_risk = 'High' AND pr.is_active = TRUE AND (ac.next_checkup_date < CURDATE() OR pr.next_anc_date < CURDATE())";
+                $followupResult = $conn->query($followupQuery);
+                $followupCount = $followupResult->fetch_assoc()['count'];
+                ?>
+                <h1><?php echo $followupCount; ?></h1>
+            </div>
+        </div>
+
+        <!-- Emergency List -->
+        <div class="emergency-list">
+            <div class="list-header">
+                <h3>📋 Emergency Cases Requiring Immediate Attention</h3>
+                <div class="header-actions">
+                    <button class="btn-primary" onclick="sendBulkAlerts()">📢 Send Bulk Alerts</button>
+                    <button class="btn-export" onclick="exportEmergencyList()">📊 Export Report</button>
+                </div>
+            </div>
+
+            <div class="emergency-cards" id="emergencyCardsContainer">
+                <?php
+                // Fetch emergency cases
+                $emergencyQuery = "SELECT 
+                    pr.*,
+                    ac.bp,
+                    ac.sugar,
+                    ac.hemoglobin,
+                    ac.risk_level as anc_risk,
+                    ac.next_checkup_date,
+                    DATEDIFF(pr.delivery_date, CURDATE()) as days_to_delivery
+                FROM pregnancy_registration pr
+                LEFT JOIN (
+                    SELECT * FROM anc_checkup 
+                    WHERE (mother_id, checkup_date) IN (
+                        SELECT mother_id, MAX(checkup_date) 
+                        FROM anc_checkup 
+                        GROUP BY mother_id
+                    )
+                ) ac ON pr.id = ac.mother_id
+                WHERE pr.is_active = TRUE
+                AND (
+                    pr.overall_risk = 'High' 
+                    OR pr.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                    OR (ac.bp LIKE '150/%' OR ac.bp LIKE '160/%')
+                    OR ac.sugar > 8.0
+                    OR ac.hemoglobin < 10.0
+                    OR (ac.next_checkup_date < CURDATE() AND pr.overall_risk = 'High')
+                )
+                ORDER BY 
+                    CASE 
+                        WHEN pr.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY) THEN 1
+                        WHEN pr.overall_risk = 'High' THEN 2
+                        ELSE 3
+                    END,
+                    pr.delivery_date ASC";
+
+                $emergencyResult = $conn->query($emergencyQuery);
+                
+                if ($emergencyResult->num_rows > 0):
+                    while ($emergency = $emergencyResult->fetch_assoc()):
+                        $emergency_id = $emergency['id'];
+                        $emergency_type = [];
+                        $urgency_level = '';
+                        
+                        // Determine emergency type
+                        if ($emergency['overall_risk'] === 'High') {
+                            $emergency_type[] = '🚨 High Risk';
+                            $urgency_level = 'critical';
+                        }
+                        
+                        if ($emergency['days_to_delivery'] >= 0 && $emergency['days_to_delivery'] <= 7) {
+                            $emergency_type[] = '📅 Due in ' . $emergency['days_to_delivery'] . ' days';
+                            $urgency_level = $emergency['days_to_delivery'] <= 3 ? 'critical' : 'high';
+                        }
+                        
+                        if ($emergency['bp'] && (strpos($emergency['bp'], '150/') !== false || strpos($emergency['bp'], '160/') !== false)) {
+                            $emergency_type[] = '🩺 High BP';
+                            $urgency_level = 'critical';
+                        }
+                        
+                        if ($emergency['sugar'] > 8.0) {
+                            $emergency_type[] = '🍬 High Sugar';
+                            if ($emergency['sugar'] > 9.0) $urgency_level = 'critical';
+                        }
+                        
+                        if ($emergency['hemoglobin'] < 10.0) {
+                            $emergency_type[] = '🩸 Low Hb';
+                            if ($emergency['hemoglobin'] < 9.0) $urgency_level = 'critical';
+                        }
+                        
+                        // Default urgency if not set
+                        if (!$urgency_level) {
+                            $urgency_level = $emergency['overall_risk'] === 'High' ? 'high' : 'medium';
+                        }
+                        
+                        $urgency_text = implode(', ', $emergency_type);
+                ?>
+                <div class="emergency-card" data-urgency="<?php echo $urgency_level; ?>">
+                    <div class="emergency-card-header">
+                        <div class="emergency-title">
+                            <h4><?php echo htmlspecialchars($emergency['mother_name']); ?></h4>
+                            <span class="emergency-id">M<?php echo str_pad($emergency['id'], 4, '0', STR_PAD_LEFT); ?></span>
+                        </div>
+                        <span class="emergency-badge <?php echo $urgency_level; ?>">
+                            <?php echo strtoupper($urgency_level); ?> PRIORITY
+                        </span>
+                    </div>
+                    
+                    <div class="emergency-card-body">
+                        <div class="emergency-info">
+                            <div class="info-row">
+                                <span class="info-label">📱 Mobile:</span>
+                                <span class="info-value"><?php echo $emergency['mobile_number']; ?></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">📍 Address:</span>
+                                <span class="info-value"><?php echo substr($emergency['address'], 0, 50) . '...'; ?></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">⚠️ Emergency Type:</span>
+                                <span class="info-value emergency-types"><?php echo $urgency_text; ?></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">📊 Latest Readings:</span>
+                                <span class="info-value readings">
+                                    BP: <?php echo $emergency['bp'] ?: 'N/A'; ?> | 
+                                    Sugar: <?php echo $emergency['sugar'] ?: 'N/A'; ?> | 
+                                    Hb: <?php echo $emergency['hemoglobin'] ?: 'N/A'; ?>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="emergency-actions">
+                            <button class="action-btn view" onclick="viewEmergencyProfile(<?php echo $emergency_id; ?>)">
+                                👁️ View Details
+                            </button>
+                            <button class="action-btn notify" onclick="sendEmergencyAlert(<?php echo $emergency_id; ?>)">
+                                📱 Send Alert
+                            </button>
+                            <button class="action-btn call" onclick="callMother('<?php echo $emergency['mobile_number']; ?>')">
+                                📞 Call Now
+                            </button>
+                            <button class="action-btn resolve" onclick="markEmergencyResolved(<?php echo $emergency_id; ?>)">
+                                ✅ Mark Resolved
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <?php endwhile; ?>
+                <?php else: ?>
+                <div class="no-emergencies">
+                    <div class="empty-state">
+                        <span>🎉 No Emergency Cases Found</span>
+                        <p>All mothers are currently stable. Check back regularly for updates.</p>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Message Templates -->
+        <div class="message-templates">
+            <h3>📝 Quick Message Templates</h3>
+            <div class="template-grid">
+                <div class="template-card" onclick="useTemplate('urgent')">
+                    <h4>🚨 Urgent Hospital Visit</h4>
+                    <p>Dear [Mother], please visit the hospital immediately for an urgent checkup. Your condition requires immediate attention.</p>
+                </div>
+                <div class="template-card" onclick="useTemplate('delivery_soon')">
+                    <h4>📅 Delivery Reminder</h4>
+                    <p>Dear [Mother], your delivery is scheduled soon. Please prepare for hospital admission and contact us for any assistance.</p>
+                </div>
+                <div class="template-card" onclick="useTemplate('followup')">
+                    <h4>🩺 Follow-up Required</h4>
+                    <p>Dear [Mother], your recent tests show abnormal results. Please schedule a follow-up appointment as soon as possible.</p>
+                </div>
+                <div class="template-card" onclick="useTemplate('medication')">
+                    <h4>💊 Medication Reminder</h4>
+                    <p>Dear [Mother], please ensure you're taking your prescribed medications regularly. Contact us if you experience any side effects.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send Custom Message -->
+        <div class="custom-message-section">
+            <h3>✉️ Send Custom Message</h3>
+            <div class="message-form">
+                <div class="form-group">
+                    <label>Select Recipients:</label>
+                    <div class="recipient-selection">
+                        <select id="emergencyRecipients" multiple class="form-control" style="height: 150px;">
+                            <?php
+                            $allEmergencies = $conn->query("SELECT id, mother_name FROM pregnancy_registration WHERE is_active = TRUE AND overall_risk = 'High' ORDER BY mother_name");
+                            while ($mother = $allEmergencies->fetch_assoc()):
+                            ?>
+                            <option value="<?php echo $mother['id']; ?>">
+                                <?php echo $mother['mother_name']; ?> (M<?php echo str_pad($mother['id'], 4, '0', STR_PAD_LEFT); ?>)
+                            </option>
+                            <?php endwhile; ?>
+                        </select>
+                        <div class="selection-actions">
+                            <button type="button" class="btn-secondary" onclick="selectAllRecipients()">Select All</button>
+                            <button type="button" class="btn-secondary" onclick="clearRecipients()">Clear All</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Message:</label>
+                    <textarea id="customMessage" rows="5" class="form-control" placeholder="Type your message here..."></textarea>
+                    <div class="message-char-count">
+                        <span id="charCount">0</span> characters (SMS limit: 160)
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Send Via:</label>
+                    <div class="send-options">
+                        <label class="option-checkbox">
+                            <input type="checkbox" id="sendSMS" checked> 📱 SMS
+                        </label>
+                        <label class="option-checkbox">
+                            <input type="checkbox" id="sendCall"> 📞 Voice Call (Simulated)
+                        </label>
+                        <label class="option-checkbox">
+                            <input type="checkbox" id="sendEmail"> ✉️ Email (If available)
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="testMessage()">Test Message</button>
+                    <button type="button" class="btn-primary" onclick="sendCustomMessage()">Send Message</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
         </main>
     </div>
 

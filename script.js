@@ -1359,3 +1359,401 @@ if (document.getElementById('loginForm')) {
         });
     });
 }
+
+// Predict Emergencies Functions
+function viewEmergencies() {
+    navigateTo('predictEmergencies');
+    loadEmergencies();
+}
+
+function loadEmergencies() {
+    // Show loading state
+    const container = document.getElementById('emergencyCardsContainer');
+    container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading emergency cases...</p></div>';
+    
+    fetch('ajax/get_emergencies.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.emergencies.length > 0) {
+                renderEmergencyCards(data.emergencies);
+            } else {
+                renderNoEmergencies();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading emergencies:', error);
+            container.innerHTML = '<div class="error-message">❌ Error loading emergency cases. Please try again.</div>';
+        });
+}
+
+function renderEmergencyCards(emergencies) {
+    const container = document.getElementById('emergencyCardsContainer');
+    let html = '';
+    
+    emergencies.forEach(emergency => {
+        const urgencyLevel = emergency.urgency_level || 'medium';
+        const emergencyTypes = emergency.emergency_types || [];
+        const urgencyText = emergencyTypes.join(', ');
+        
+        html += `
+        <div class="emergency-card" data-urgency="${urgencyLevel}">
+            <div class="emergency-card-header">
+                <div class="emergency-title">
+                    <h4>${escapeHtml(emergency.mother_name)}</h4>
+                    <span class="emergency-id">M${String(emergency.id).padStart(4, '0')}</span>
+                </div>
+                <span class="emergency-badge ${urgencyLevel}">
+                    ${urgencyLevel.toUpperCase()} PRIORITY
+                </span>
+            </div>
+            
+            <div class="emergency-card-body">
+                <div class="emergency-info">
+                    <div class="info-row">
+                        <span class="info-label">📱 Mobile:</span>
+                        <span class="info-value">${emergency.mobile_number}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">📍 Address:</span>
+                        <span class="info-value">${emergency.address ? escapeHtml(emergency.address.substring(0, 50)) + '...' : 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">⚠️ Emergency Type:</span>
+                        <span class="info-value emergency-types">${urgencyText}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">📊 Latest Readings:</span>
+                        <span class="info-value readings">
+                            BP: ${emergency.bp || 'N/A'} | 
+                            Sugar: ${emergency.sugar || 'N/A'} | 
+                            Hb: ${emergency.hemoglobin || 'N/A'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="emergency-actions">
+                    <button class="action-btn view" onclick="viewEmergencyProfile(${emergency.id})">
+                        👁️ View Details
+                    </button>
+                    <button class="action-btn notify" onclick="sendEmergencyAlert(${emergency.id})">
+                        📱 Send Alert
+                    </button>
+                    <button class="action-btn call" onclick="callMother('${emergency.mobile_number}')">
+                        📞 Call Now
+                    </button>
+                    <button class="action-btn resolve" onclick="markEmergencyResolved(${emergency.id})">
+                        ✅ Mark Resolved
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function renderNoEmergencies() {
+    const container = document.getElementById('emergencyCardsContainer');
+    container.innerHTML = `
+        <div class="no-emergencies">
+            <div class="empty-state">
+                <span>🎉 No Emergency Cases Found</span>
+                <p>All mothers are currently stable. Check back regularly for updates.</p>
+            </div>
+        </div>
+    `;
+}
+
+function viewEmergencyProfile(motherId) {
+    viewMotherProfile(motherId);
+}
+
+function sendEmergencyAlert(motherId) {
+    // Get mother details
+    fetch(`ajax/get_mother_details.php?id=${motherId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const message = `🚨 EMERGENCY ALERT: Dear ${data.mother_name}, please visit the hospital immediately. Your condition requires urgent attention. Contact: Hospital Emergency - 999`;
+                const phoneNumber = data.mobile_number;
+                
+                if (confirm(`Send emergency alert to ${data.mother_name} (${phoneNumber})?`)) {
+                    // In real app, integrate with SMS gateway
+                    // For demo, we'll show a success message
+                    alert(`📢 EMERGENCY ALERT SENT!\n\nTo: ${data.mother_name}\nPhone: ${phoneNumber}\n\nMessage:\n${message}`);
+                    
+                    // Log the alert
+                    logEmergencyAlert(motherId, message);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error sending alert. Please try again.');
+        });
+}
+
+function callMother(phoneNumber) {
+    if (confirm(`Call ${phoneNumber}?`)) {
+        // In a real app, this would initiate a phone call
+        // For demo, we'll simulate it
+        alert(`📞 Calling ${phoneNumber}...\n\nNote: In a real application, this would initiate a phone call.`);
+        
+        // You can also use tel: link for mobile devices
+        // window.location.href = `tel:${phoneNumber}`;
+    }
+}
+
+function markEmergencyResolved(motherId) {
+    if (confirm('Mark this emergency case as resolved?')) {
+        const notes = prompt('Add resolution notes (optional):');
+        
+        fetch('ajax/mark_emergency_resolved.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `mother_id=${motherId}&notes=${encodeURIComponent(notes || '')}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Emergency case marked as resolved');
+                loadEmergencies(); // Refresh the list
+                loadDashboardData(); // Update dashboard counts
+            } else {
+                alert('❌ Error: ' + (data.error || 'Failed to update'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Network error. Please try again.');
+        });
+    }
+}
+
+function sendBulkAlerts() {
+    const selected = getSelectedRecipients();
+    if (selected.length === 0) {
+        alert('Please select at least one recipient from the list below.');
+        return;
+    }
+    
+    const message = prompt('Enter the message to send to all selected recipients:');
+    if (!message || message.trim() === '') {
+        alert('Message cannot be empty');
+        return;
+    }
+    
+    if (confirm(`Send this message to ${selected.length} mother(s)?\n\n${message}`)) {
+        // Simulate sending
+        alert(`📢 Bulk message sent to ${selected.length} recipients!\n\nIn a real application, this would send SMS to all selected mothers.`);
+        
+        // Log the bulk message
+        logBulkAlert(selected.length, message);
+    }
+}
+
+function exportEmergencyList() {
+    // Create CSV data
+    const headers = ['ID', 'Name', 'Mobile', 'Emergency Type', 'Priority', 'BP', 'Sugar', 'Hb', 'Delivery Date'];
+    const rows = [];
+    
+    document.querySelectorAll('.emergency-card').forEach(card => {
+        const id = card.querySelector('.emergency-id').textContent;
+        const name = card.querySelector('h4').textContent;
+        const mobile = card.querySelector('.info-row:nth-child(1) .info-value').textContent;
+        const emergencyType = card.querySelector('.emergency-types').textContent;
+        const priority = card.querySelector('.emergency-badge').textContent;
+        const readings = card.querySelector('.readings').textContent;
+        
+        // Extract readings
+        const bp = readings.match(/BP:\s*([^|]+)/)?.[1]?.trim() || 'N/A';
+        const sugar = readings.match(/Sugar:\s*([^|]+)/)?.[1]?.trim() || 'N/A';
+        const hb = readings.match(/Hb:\s*([^|]+)/)?.[1]?.trim() || 'N/A';
+        
+        rows.push([id, name, mobile, emergencyType, priority, bp, sugar, hb]);
+    });
+    
+    // Convert to CSV
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach(row => {
+        csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+    
+    // Download
+    downloadCSV(csvContent, `Emergency_List_${new Date().toISOString().split('T')[0]}.csv`);
+    alert('✅ Emergency list exported successfully!');
+}
+
+function useTemplate(templateType) {
+    const templates = {
+        'urgent': '🚨 EMERGENCY ALERT: Please visit the hospital immediately for urgent checkup. Your condition requires immediate attention.',
+        'delivery_soon': '📅 DELIVERY REMINDER: Your delivery is scheduled soon. Please prepare for hospital admission and contact us for assistance.',
+        'followup': '🩺 FOLLOW-UP REQUIRED: Your recent tests show abnormal results. Please schedule a follow-up appointment immediately.',
+        'medication': '💊 MEDICATION REMINDER: Ensure you\'re taking prescribed medications regularly. Contact us for any side effects.'
+    };
+    
+    document.getElementById('customMessage').value = templates[templateType] || '';
+    updateCharCount();
+}
+
+function selectAllRecipients() {
+    const select = document.getElementById('emergencyRecipients');
+    for (let i = 0; i < select.options.length; i++) {
+        select.options[i].selected = true;
+    }
+}
+
+function clearRecipients() {
+    const select = document.getElementById('emergencyRecipients');
+    for (let i = 0; i < select.options.length; i++) {
+        select.options[i].selected = false;
+    }
+}
+
+function getSelectedRecipients() {
+    const select = document.getElementById('emergencyRecipients');
+    const selected = [];
+    for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].selected) {
+            selected.push({
+                id: select.options[i].value,
+                name: select.options[i].text
+            });
+        }
+    }
+    return selected;
+}
+
+function updateCharCount() {
+    const message = document.getElementById('customMessage').value;
+    document.getElementById('charCount').textContent = message.length;
+    
+    // Color code based on length
+    const charCount = document.getElementById('charCount');
+    if (message.length > 160) {
+        charCount.style.color = '#dc3545';
+    } else if (message.length > 140) {
+        charCount.style.color = '#fd7e14';
+    } else {
+        charCount.style.color = '#28a745';
+    }
+}
+
+function testMessage() {
+    const message = document.getElementById('customMessage').value;
+    if (!message.trim()) {
+        alert('Please enter a message first');
+        return;
+    }
+    
+    alert(`📝 MESSAGE PREVIEW:\n\n${message}\n\nLength: ${message.length} characters\nSMS Count: ${Math.ceil(message.length / 160)}`);
+}
+
+function sendCustomMessage() {
+    const selected = getSelectedRecipients();
+    const message = document.getElementById('customMessage').value.trim();
+    const sendSMS = document.getElementById('sendSMS').checked;
+    const sendCall = document.getElementById('sendCall').checked;
+    const sendEmail = document.getElementById('sendEmail').checked;
+    
+    if (selected.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+    }
+    
+    if (!message) {
+        alert('Please enter a message');
+        return;
+    }
+    
+    if (!sendSMS && !sendCall && !sendEmail) {
+        alert('Please select at least one delivery method');
+        return;
+    }
+    
+    const methods = [];
+    if (sendSMS) methods.push('SMS');
+    if (sendCall) methods.push('Voice Call');
+    if (sendEmail) methods.push('Email');
+    
+    const confirmMessage = `Send message via ${methods.join(', ')} to ${selected.length} recipient(s)?\n\nRecipients:\n${selected.map(r => r.name).join('\n')}\n\nMessage (${message.length} chars):\n${message}`;
+    
+    if (confirm(confirmMessage)) {
+        // Simulate sending
+        const sentMethods = [];
+        if (sendSMS) sentMethods.push('📱 SMS sent');
+        if (sendCall) sentMethods.push('📞 Voice call simulated');
+        if (sendEmail) sentMethods.push('✉️ Email sent');
+        
+        alert(`✅ MESSAGE SENT!\n\n${sentMethods.join('\n')}\n\nTo: ${selected.length} recipient(s)`);
+        
+        // Clear form
+        document.getElementById('customMessage').value = '';
+        updateCharCount();
+    }
+}
+
+function downloadCSV(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function logEmergencyAlert(motherId, message) {
+    const logs = JSON.parse(localStorage.getItem('emergency_logs') || '[]');
+    logs.push({
+        mother_id: motherId,
+        type: 'emergency_alert',
+        message: message,
+        timestamp: new Date().toISOString(),
+        status: 'sent'
+    });
+    localStorage.setItem('emergency_logs', JSON.stringify(logs));
+}
+
+function logBulkAlert(recipientCount, message) {
+    const logs = JSON.parse(localStorage.getItem('emergency_logs') || '[]');
+    logs.push({
+        type: 'bulk_alert',
+        recipient_count: recipientCount,
+        message: message,
+        timestamp: new Date().toISOString(),
+        status: 'sent'
+    });
+    localStorage.setItem('emergency_logs', JSON.stringify(logs));
+}
+
+// Initialize character count on page load and when typing
+document.addEventListener('DOMContentLoaded', function() {
+    const messageTextarea = document.getElementById('customMessage');
+    if (messageTextarea) {
+        messageTextarea.addEventListener('input', updateCharCount);
+        updateCharCount();
+    }
+    
+    // Also add navigation for the new section
+    const navButtons = document.querySelectorAll(".nav-btn");
+    navButtons.forEach(btn => {
+        btn.addEventListener("click", function() {
+            const targetId = this.getAttribute("data-target");
+            if (targetId === 'predictEmergencies') {
+                loadEmergencies();
+            }
+        });
+    });
+});
