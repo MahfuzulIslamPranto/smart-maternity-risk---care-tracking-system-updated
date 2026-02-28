@@ -187,35 +187,90 @@ function viewEmergencies() {
     // This would filter the mother list
 }
 
+// Function to view safe pregnancies (Low + Medium risk)
 function viewSafePregnancies() {
+    // Navigate to mother management section
     navigateTo('motherManagement');
-    document.querySelector('#filterRisk').value = 'Medium,Low';
-    filterMothers();
+    
+    // Activate the Mother List tab
     document.querySelector('[data-tab="motherList"]').click();
+    
+    // Set filter to show Low and Medium risk (excluding High)
+    // Clear any existing single risk filter
+    document.getElementById('filterRisk').value = '';
+    
+    // Call a custom filter function for safe pregnancies
+    filterSafePregnancies();
 }
 
-function searchMothers() {
-    const searchTerm = document.getElementById('searchMother').value.toLowerCase();
+// Custom filter for safe pregnancies (Low and Medium only)
+function filterSafePregnancies() {
     const rows = document.querySelectorAll('#motherTableBody tr');
+    let visibleCount = 0;
     
     rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchTerm) ? '' : 'none';
-    });
-}
-
-function filterMothers() {
-    const filterValue = document.getElementById('filterRisk').value;
-    const rows = document.querySelectorAll('#motherTableBody tr');
-    
-    rows.forEach(row => {
+        if (row.classList.contains('no-data')) return;
+        
         const risk = row.getAttribute('data-risk');
-        if (!filterValue || filterValue === risk) {
+        
+        // Show if risk is Low or Medium (case-insensitive)
+        if (risk && (risk.toLowerCase() === 'low' || risk.toLowerCase() === 'medium')) {
             row.style.display = '';
+            visibleCount++;
         } else {
             row.style.display = 'none';
         }
     });
+    
+    // Show/hide empty state
+    const noDataRow = document.querySelector('#motherTableBody .no-data');
+    if (noDataRow) {
+        noDataRow.style.display = visibleCount === 0 ? '' : 'none';
+    }
+    
+    // Also update the filter dropdown to reflect that we're showing both
+    document.getElementById('filterRisk').value = '';
+}
+
+// Modify the existing filterMothers() to handle single value (for other filters)
+function filterMothers() {
+    const riskFilter = document.getElementById('filterRisk').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+    const rows = document.querySelectorAll('#motherTableBody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        if (row.classList.contains('no-data')) return;
+        
+        const risk = row.getAttribute('data-risk');
+        const status = row.getAttribute('data-status');
+        
+        let show = true;
+        
+        // Apply risk filter (only if a specific value is selected)
+        if (riskFilter && risk !== riskFilter) {
+            show = false;
+        }
+        
+        // Apply status filter
+        if (statusFilter) {
+            if (statusFilter === 'active' && status !== 'active') show = false;
+            if (statusFilter === 'inactive' && status !== 'inactive') show = false;
+        }
+        
+        if (show) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Show/hide empty state
+    const noDataRow = document.querySelector('#motherTableBody .no-data');
+    if (noDataRow) {
+        noDataRow.style.display = visibleCount === 0 ? '' : 'none';
+    }
 }
 
 function filterANC() {
@@ -258,8 +313,7 @@ function viewMotherProfile(motherId) {
 }
 
 function editMother(motherId) {
-    // Implement edit functionality
-    alert(`Edit mother ID: ${motherId}`);
+    openUpdateProfileModal(motherId);
 }
 
 function deleteMother(motherId) {
@@ -1757,3 +1811,242 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Open Update Profile Modal and load current data
+function openUpdateProfileModal(motherId) {
+    // Fetch current mother data
+    fetch(`ajax/get_mother_details.php?id=${motherId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('update_mother_id').value = motherId;
+                document.getElementById('update_mother_name').value = data.mother_name || '';
+                document.getElementById('update_age').value = data.age || '';
+                document.getElementById('update_blood_group').value = data.blood_group || '';
+                document.getElementById('update_mobile').value = data.mobile_number || '';
+                document.getElementById('update_nid').value = data.nid_number || '';
+                document.getElementById('update_address').value = data.address || '';
+                document.getElementById('update_delivery_date').value = data.delivery_date || '';
+                document.getElementById('update_weeks').value = data.pregnancy_weeks || '';
+                document.getElementById('update_complication').value = data.complication || '';
+                document.getElementById('update_risk').value = data.overall_risk || 'Low';
+                document.getElementById('update_is_active').checked = data.is_active == 1;
+                openModal('updateProfileModal');
+            } else {
+                alert('Error loading mother data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load mother data');
+        });
+}
+
+// Submit update profile form
+function submitUpdateProfile() {
+    const form = document.getElementById('updateProfileForm');
+    const formData = new FormData(form);
+    
+    // Show loading
+    const btn = document.querySelector('#updateProfileModal .btn-primary');
+    const originalText = btn.textContent;
+    btn.innerHTML = '⏳ Updating...';
+    btn.disabled = true;
+    
+    fetch('ajax/update_mother_profile.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Profile updated successfully');
+            closeModal('updateProfileModal');
+            // Reload the profile view
+            loadMotherProfile(currentProfileMotherId);
+        } else {
+            alert('❌ Error: ' + (data.error || 'Update failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Network error. Please try again.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Open Add ANC Modal
+function openAddANCModal(motherId) {
+    document.getElementById('anc_mother_id').value = motherId;
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('anc_checkup_date').value = today;
+    const nextMonth = new Date();
+    nextMonth.setDate(nextMonth.getDate() + 30);
+    document.getElementById('anc_next_date').value = nextMonth.toISOString().split('T')[0];
+    // Clear other fields
+    document.getElementById('anc_bp').value = '';
+    document.getElementById('anc_sugar').value = '';
+    document.getElementById('anc_hemoglobin').value = '';
+    document.getElementById('anc_weight').value = '';
+    document.getElementById('anc_risk').value = 'auto';
+    document.getElementById('anc_notes').value = '';
+    openModal('addANCModal');
+}
+
+// Submit Add ANC form
+function submitAddANC() {
+    const form = document.getElementById('addANCFormModal');
+    const formData = new FormData(form);
+    
+    const btn = document.querySelector('#addANCModal .btn-primary');
+    const originalText = btn.textContent;
+    btn.innerHTML = '⏳ Saving...';
+    btn.disabled = true;
+    
+    fetch('ajax/save_anc_record.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ANC record saved successfully');
+            closeModal('addANCModal');
+            // Refresh profile to show new ANC
+            loadMotherProfile(currentProfileMotherId);
+            // Also refresh ANC history in ANC section if open
+            if (!document.getElementById('ancHistory').classList.contains('hidden')) {
+                loadANCHistory();
+            }
+        } else {
+            alert('❌ Error: ' + (data.error || 'Save failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Network error. Please try again.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Open Mark Delivery Modal
+function openMarkDeliveryModal(motherId) {
+    document.getElementById('delivery_mother_id').value = motherId;
+    // Set default delivery date to today
+    document.getElementById('delivery_date').value = new Date().toISOString().split('T')[0];
+    // Clear other fields
+    document.getElementById('delivery_type').value = '';
+    document.getElementById('baby_weight').value = '';
+    document.getElementById('baby_gender').value = '';
+    document.getElementById('baby_length').value = '';
+    document.getElementById('apgar_score').value = '';
+    document.getElementById('mother_condition').value = 'Good';
+    document.getElementById('baby_condition').value = 'Healthy';
+    document.getElementById('delivery_complications').value = '';
+    document.getElementById('delivery_notes').value = '';
+    openModal('markDeliveryModal');
+}
+
+// Submit Mark Delivery form
+function submitMarkDelivery() {
+    const form = document.getElementById('markDeliveryForm');
+    const formData = new FormData(form);
+    
+    const btn = document.querySelector('#markDeliveryModal .btn-primary');
+    const originalText = btn.textContent;
+    btn.innerHTML = '⏳ Saving...';
+    btn.disabled = true;
+    
+    fetch('ajax/mark_delivery.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Delivery recorded successfully');
+            closeModal('markDeliveryModal');
+            // Reload profile (mother will become inactive)
+            loadMotherProfile(currentProfileMotherId);
+            // Refresh dashboard counts
+            refreshDashboard();
+        } else {
+            alert('❌ Error: ' + (data.error || 'Save failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Network error. Please try again.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Print Profile
+function printProfile(motherId) {
+    // Hide sidebar, topbar, etc. using a print stylesheet or just window.print()
+    // For simplicity, just call print
+    window.print();
+    // You could also open a new window with printable version
+}
+
+// Open Reminder Modal
+function sendReminder(motherId) {
+    document.getElementById('reminder_mother_id').value = motherId;
+    document.getElementById('reminder_message').value = '';
+    openModal('reminderModal');
+}
+
+// Use template in reminder
+function useReminderTemplate() {
+    const template = document.getElementById('reminder_template').value;
+    if (template) {
+        document.getElementById('reminder_message').value = template;
+    }
+}
+
+// Send reminder message
+function sendReminderMessage() {
+    const motherId = document.getElementById('reminder_mother_id').value;
+    const message = document.getElementById('reminder_message').value.trim();
+    const sendSMS = document.querySelector('input[name="method_sms"]').checked;
+    const sendCall = document.querySelector('input[name="method_call"]').checked;
+    
+    if (!message) {
+        alert('Please enter a message');
+        return;
+    }
+    
+    if (!sendSMS && !sendCall) {
+        alert('Please select at least one delivery method');
+        return;
+    }
+    
+    // Simulate sending
+    let methods = [];
+    if (sendSMS) methods.push('SMS');
+    if (sendCall) methods.push('Voice Call');
+    
+    alert(`📱 Reminder sent via ${methods.join(' and ')} to mother ID ${motherId}\n\nMessage: ${message}`);
+    
+    // Log the reminder (optional)
+    logNotification(motherId, methods.join(','), message);
+    
+    closeModal('reminderModal');
+}
+
+// Make sure closeModal function exists (should already be there)
+// If not, add:
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}

@@ -1220,6 +1220,274 @@ $recentAlerts = $conn->query($recentAlertsQuery);
         </div>
     </div>
 </div>
+<!-- Update Profile Modal -->
+<div id="updateProfileModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>✏️ Update Mother Profile</h3>
+            <button class="modal-close" onclick="closeModal('updateProfileModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="updateProfileForm">
+                <input type="hidden" name="mother_id" id="update_mother_id">
+                <div class="form-group">
+                    <label>Mother's Name *</label>
+                    <input type="text" name="mother_name" id="update_mother_name" required class="form-control">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Age *</label>
+                        <input type="number" name="age" id="update_age" required class="form-control" min="15" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label>Blood Group</label>
+                        <select name="blood_group" id="update_blood_group" class="form-control">
+                            <option value="">Select</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mobile Number *</label>
+                        <input type="text" name="mobile_number" id="update_mobile" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>NID Number</label>
+                        <input type="text" name="nid_number" id="update_nid" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea name="address" id="update_address" rows="2" class="form-control"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Expected Delivery Date</label>
+                        <input type="date" name="delivery_date" id="update_delivery_date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Pregnancy Weeks</label>
+                        <input type="number" name="pregnancy_weeks" id="update_weeks" class="form-control" min="0" max="42">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Complications / Medical History</label>
+                    <textarea name="complication" id="update_complication" rows="2" class="form-control"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Risk Level</label>
+                    <select name="overall_risk" id="update_risk" class="form-control">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_active" id="update_is_active" value="1" checked> Active Pregnancy
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('updateProfileModal')">Cancel</button>
+            <button class="btn-primary" onclick="submitUpdateProfile()">Update Profile</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add ANC Record Modal -->
+<div id="addANCModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>➕ Add ANC Record</h3>
+            <button class="modal-close" onclick="closeModal('addANCModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addANCFormModal">
+                <input type="hidden" name="mother_id" id="anc_mother_id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Checkup Date *</label>
+                        <input type="date" name="checkup_date" id="anc_checkup_date" required class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Blood Pressure *</label>
+                        <input type="text" name="bp" id="anc_bp" required class="form-control" placeholder="120/80">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sugar (mmol/L) *</label>
+                        <input type="number" step="0.1" name="sugar" id="anc_sugar" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Hemoglobin (g/dL) *</label>
+                        <input type="number" step="0.1" name="hemoglobin" id="anc_hemoglobin" required class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Weight (kg) *</label>
+                        <input type="number" step="0.1" name="weight" id="anc_weight" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Next Checkup Date *</label>
+                        <input type="date" name="next_checkup_date" id="anc_next_date" required class="form-control" value="<?php echo date('Y-m-d', strtotime('+30 days')); ?>">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Risk Level</label>
+                    <select name="risk_level" id="anc_risk" class="form-control">
+                        <option value="auto">Auto Calculate</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" id="anc_notes" rows="2" class="form-control"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('addANCModal')">Cancel</button>
+            <button class="btn-primary" onclick="submitAddANC()">Save ANC Record</button>
+        </div>
+    </div>
+</div>
+
+<!-- Mark Delivery Modal -->
+<div id="markDeliveryModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>👶 Mark as Delivered</h3>
+            <button class="modal-close" onclick="closeModal('markDeliveryModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="markDeliveryForm">
+                <input type="hidden" name="mother_id" id="delivery_mother_id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Delivery Date *</label>
+                        <input type="date" name="delivery_date" id="delivery_date" required class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Delivery Type *</label>
+                        <select name="delivery_type" id="delivery_type" required class="form-control">
+                            <option value="">Select</option>
+                            <option value="Normal">Normal</option>
+                            <option value="C-Section">C-Section</option>
+                            <option value="Assisted">Assisted</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Baby Weight (kg) *</label>
+                        <input type="number" step="0.01" name="baby_weight" id="baby_weight" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Baby Gender *</label>
+                        <select name="baby_gender" id="baby_gender" required class="form-control">
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Baby Length (cm)</label>
+                        <input type="number" step="0.1" name="baby_length" id="baby_length" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Apgar Score</label>
+                        <input type="number" name="apgar_score" id="apgar_score" class="form-control" min="0" max="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mother Condition *</label>
+                        <select name="mother_condition" id="mother_condition" required class="form-control">
+                            <option value="Good">Good</option>
+                            <option value="Stable">Stable</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Baby Condition *</label>
+                        <select name="baby_condition" id="baby_condition" required class="form-control">
+                            <option value="Healthy">Healthy</option>
+                            <option value="Stable">Stable</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Complications</label>
+                    <textarea name="complications" id="delivery_complications" rows="2" class="form-control"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Additional Notes</label>
+                    <textarea name="notes" id="delivery_notes" rows="2" class="form-control"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('markDeliveryModal')">Cancel</button>
+            <button class="btn-primary" onclick="submitMarkDelivery()">Save Delivery</button>
+        </div>
+    </div>
+</div>
+
+<!-- Send Reminder Modal (simple) -->
+<div id="reminderModal" class="modal hidden">
+    <div class="modal-content" style="width: 400px;">
+        <div class="modal-header">
+            <h3>📱 Send Reminder</h3>
+            <button class="modal-close" onclick="closeModal('reminderModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="reminderForm">
+                <input type="hidden" name="mother_id" id="reminder_mother_id">
+                <div class="form-group">
+                    <label>Message Template</label>
+                    <select id="reminder_template" class="form-control" onchange="useReminderTemplate()">
+                        <option value="">Custom</option>
+                        <option value="Dear [Mother], please remember your upcoming ANC appointment on [Date].">ANC Reminder</option>
+                        <option value="Dear [Mother], your delivery is approaching. Please prepare for hospital admission.">Delivery Preparation</option>
+                        <option value="Dear [Mother], your recent test results require follow-up. Please contact the clinic.">Follow-up Required</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea name="message" id="reminder_message" rows="4" class="form-control" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Send via</label>
+                    <div>
+                        <label><input type="checkbox" name="method_sms" value="sms" checked> SMS</label>
+                        <label style="margin-left: 15px;"><input type="checkbox" name="method_call" value="call"> Voice Call (simulated)</label>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('reminderModal')">Cancel</button>
+            <button class="btn-primary" onclick="sendReminderMessage()">Send</button>
+        </div>
+    </div>
+</div>
         </main>
     </div>
 
